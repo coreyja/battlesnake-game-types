@@ -987,6 +987,17 @@ mod test {
     }
 
     #[test]
+    /// I think this test shows that the Wire has a bug currently. Need to compare with the Go
+    /// version. Maybe I need to break out my Fuzzer stuff again.
+    fn test_all_options_dead() {
+        let game_fixture =
+            include_str!("../../fixtures/all-options-dead-prefer-out-of-bounds.json");
+        let g: Result<DEGame, _> = serde_json::from_slice(game_fixture.as_bytes());
+        let g = g.expect("the json literal is valid");
+        test_simulation_equivalents(g);
+    }
+
+    #[test]
     fn test_compare_simulators() {
         let game_fixture = include_str!("../../fixtures/tree_search_collision.json");
         let g: Result<DEGame, _> = serde_json::from_slice(game_fixture.as_bytes());
