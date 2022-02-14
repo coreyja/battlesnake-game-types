@@ -193,7 +193,7 @@ pub trait SimulableGame<T: SimulatorInstruments>:
         &self,
         instruments: &T,
         snake_ids: Vec<Self::SnakeIDType>,
-    ) -> Box<dyn Iterator<Item=(Vec<(Self::SnakeIDType, Move)>, Self)> + '_> {
+    ) -> Box<dyn Iterator<Item = (Vec<(Self::SnakeIDType, Move)>, Self)> + '_> {
         let moves_to_simulate = Move::all();
         let build = snake_ids
             .into_iter()
@@ -206,8 +206,10 @@ pub trait SimulableGame<T: SimulatorInstruments>:
     fn simulate_with_moves<S>(
         &self,
         instruments: &T,
-        snake_ids_and_moves: impl IntoIterator<Item=(Self::SnakeIDType, S)>,
-    ) -> Box<dyn Iterator<Item=(Vec<(Self::SnakeIDType, Move)>, Self)> + '_> where S: Borrow<[Move]>;
+        snake_ids_and_moves: impl IntoIterator<Item = (Self::SnakeIDType, S)>,
+    ) -> Box<dyn Iterator<Item = (Vec<(Self::SnakeIDType, Move)>, Self)> + '_>
+    where
+        S: Borrow<[Move]>;
 }
 
 /// A game where positions can be checked for hazards
@@ -300,7 +302,9 @@ pub trait HealthGettableGame: SnakeIDGettableGame {
 /// a game for which random reasonable moves for a given snake can be determined. e.g. do not collide with yourself
 pub trait RandomReasonableMovesGame: SnakeIDGettableGame {
     #[allow(missing_docs)]
-    fn random_reasonable_move_for_each_snake<'a>(&'a self) -> Box<dyn Iterator<Item=(Self::SnakeIDType, Move)> + 'a>;
+    fn random_reasonable_move_for_each_snake<'a>(
+        &'a self,
+    ) -> Box<dyn Iterator<Item = (Self::SnakeIDType, Move)> + 'a>;
 }
 
 /// a game for which the neighbors of a given Position can be determined
@@ -341,6 +345,18 @@ pub trait SnakeBodyGettableGame: PositionGettableGame + SnakeIDGettableGame {
     fn get_snake_body_vec(&self, snake_id: &Self::SnakeIDType) -> Vec<Self::NativePositionType>;
 }
 
+/// A game where an Snake body can be returned as an Iterator. The order of the body pieces is NOT
+/// guaranteed. Implementations can take advantage of this to optimize the body iteration.
+/// Implementations are also allowed to ignore double and triple stacked pieces and only return the
+/// body piece a single time.
+pub trait SnakeBodyIterableGame: PositionGettableGame + SnakeIDGettableGame {
+    /// return a Vec of the positions for a given snake body, in order from head to tail
+    fn get_snake_body_iter<'s>(
+        &'s self,
+        snake_id: &Self::SnakeIDType,
+    ) -> Box<dyn Iterator<Item = Self::NativePositionType> + 's>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -362,7 +378,8 @@ mod tests {
     fn test_move_from_vector() {
         let g = fixture();
         let you_id = g.you.id.clone();
-        let mut s_result = g.simulate_with_moves(&Instruments {}, [(you_id, [Move::Down].as_slice())]);
+        let mut s_result =
+            g.simulate_with_moves(&Instruments {}, [(you_id, [Move::Down].as_slice())]);
         let new_g = s_result.next().unwrap().1;
         let new_head = new_g.you.head;
         let offset = new_head.sub_vec(g.you.head.to_vector()).to_vector();

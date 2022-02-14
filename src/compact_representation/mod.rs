@@ -1,12 +1,10 @@
 //! A compact board representation that is efficient for simulation
-pub use crate::compact_representation::eval::{
-    SinglePlayerMoveResult,
-};
+pub use crate::compact_representation::eval::SinglePlayerMoveResult;
 use crate::types::{
     build_snake_id_map, FoodGettableGame, HazardQueryableGame, HazardSettableGame,
     HeadGettableGame, HealthGettableGame, LengthGettableGame, PositionGettableGame,
-    RandomReasonableMovesGame, SizeDeterminableGame, SnakeIDGettableGame, SnakeIDMap, SnakeId,
-    VictorDeterminableGame, YouDeterminableGame, N_MOVES
+    RandomReasonableMovesGame, SizeDeterminableGame, SnakeBodyIterableGame, SnakeIDGettableGame,
+    SnakeIDMap, SnakeId, VictorDeterminableGame, YouDeterminableGame, N_MOVES,
 };
 /// you almost certainly want to use the `convert_from_game` method to
 /// cast from a json represention to a `CellBoard`
@@ -833,31 +831,34 @@ impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> VictorDetermi
 impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> RandomReasonableMovesGame
     for CellBoard<T, BOARD_SIZE, MAX_SNAKES>
 {
-    fn random_reasonable_move_for_each_snake<'a>(&'a self) -> Box<dyn std::iter::Iterator<Item = (SnakeId, Move)> + 'a> {
+    fn random_reasonable_move_for_each_snake<'a>(
+        &'a self,
+    ) -> Box<dyn std::iter::Iterator<Item = (SnakeId, Move)> + 'a> {
         let width = self.actual_width;
-        Box::new(self.healths
-            .iter()
-            .enumerate()
-            .filter(|(_, health)| **health > 0)
-            .map(move |(idx, _)| {
-                let head = self.heads[idx];
-                let head_pos = head.into_position(width);
+        Box::new(
+            self.healths
+                .iter()
+                .enumerate()
+                .filter(|(_, health)| **health > 0)
+                .map(move |(idx, _)| {
+                    let head = self.heads[idx];
+                    let head_pos = head.into_position(width);
 
-                let mv = Move::all()
-                    .iter()
-                    .filter(|mv| {
-                        let new_head = head_pos.add_vec(mv.to_vector());
-                        let ci = CellIndex::new(head_pos.add_vec(mv.to_vector()), width);
+                    let mv = Move::all()
+                        .iter()
+                        .filter(|mv| {
+                            let new_head = head_pos.add_vec(mv.to_vector());
+                            let ci = CellIndex::new(head_pos.add_vec(mv.to_vector()), width);
 
-                        !self.off_board(new_head)
-                            && !self.get_cell(ci).is_body_segment()
-                            && !self.get_cell(ci).is_head()
-                    })
-                    .choose(&mut thread_rng())
-                    .copied()
-                    .unwrap_or(Move::Up);
-                (SnakeId(idx as u8), mv)
-            })
+                            !self.off_board(new_head)
+                                && !self.get_cell(ci).is_body_segment()
+                                && !self.get_cell(ci).is_head()
+                        })
+                        .choose(&mut thread_rng())
+                        .copied()
+                        .unwrap_or(Move::Up);
+                    (SnakeId(idx as u8), mv)
+                }),
         )
     }
 }
@@ -869,9 +870,11 @@ impl<T: SimulatorInstruments, N: CellNum, const BOARD_SIZE: usize, const MAX_SNA
     fn simulate_with_moves<S>(
         &self,
         instruments: &T,
-        snake_ids_and_moves: impl IntoIterator<Item=(Self::SnakeIDType, S)>
-    ) -> Box<dyn Iterator<Item=(Vec<(Self::SnakeIDType, Move)>, Self)> + '_> 
-        where S: Borrow<[Move]> {
+        snake_ids_and_moves: impl IntoIterator<Item = (Self::SnakeIDType, S)>,
+    ) -> Box<dyn Iterator<Item = (Vec<(Self::SnakeIDType, Move)>, Self)> + '_>
+    where
+        S: Borrow<[Move]>,
+    {
         let start = Instant::now();
         let snake_ids_and_moves = snake_ids_and_moves.into_iter().collect_vec();
 
@@ -898,7 +901,8 @@ impl<T: SimulatorInstruments, N: CellNum, const BOARD_SIZE: usize, const MAX_SNA
             .map(|(snake_id, moves)| {
                 let first_move = moves.borrow()[0];
                 let mvs = moves
-                    .borrow().iter()
+                    .borrow()
+                    .iter()
                     .filter(|mv| !dead_snakes_table[snake_id.0 as usize][mv.as_index()])
                     .map(|mv| (snake_id, *mv))
                     .collect_vec();
@@ -998,6 +1002,29 @@ impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> SizeDetermina
 
     fn get_height(&self) -> u32 {
         self.actual_height() as u32
+    }
+}
+impl<T: CellNum, const BOARD_SIZEL: usize, const MAX_SNAKES: usize> SnakeBodyIterableGame
+    for CellBoard<T, BOARD_SIZEL, MAX_SNAKES>
+{
+    fn get_snake_body_iter<'s>(
+        &'s self,
+        snake_id: &Self::SnakeIDType,
+    ) -> Box<dyn Iterator<Item = Self::NativePositionType> + 's> {
+        let head = self.get_head_as_native_position(snake_id);
+
+        let mut cur = Some(self.get_cell(head).get_tail_position(head).unwrap());
+
+        Box::new(std::iter::from_fn(move || {
+            if let Some(c) = cur {
+                let to_return = c;
+                cur = self.get_cell(c).get_next_index();
+
+                Some(to_return)
+            } else {
+                None
+            }
+        }))
     }
 }
 
@@ -1117,7 +1144,9 @@ mod test {
         let instruments = Instruments;
         eprintln!("{}", compact);
         for mv in moves {
-            let res = compact.simulate_with_moves(&instruments, vec![(SnakeId(0), [mv].as_slice())]).collect_vec();
+            let res = compact
+                .simulate_with_moves(&instruments, vec![(SnakeId(0), [mv].as_slice())])
+                .collect_vec();
             compact = res[0].1;
             eprintln!("{}", compact);
         }
@@ -1202,10 +1231,8 @@ mod test {
             while !g.is_over() {
                 let orig = g.clone();
                 let moves = g.random_reasonable_move_for_each_snake();
-                let non_compact_move_map = moves
-                    .into_iter()
-                    .map(|(id, mv)| (id, [mv]))
-                    .collect_vec();
+                let non_compact_move_map =
+                    moves.into_iter().map(|(id, mv)| (id, [mv])).collect_vec();
                 let compact_move_map = non_compact_move_map
                     .iter()
                     .cloned()
@@ -1214,8 +1241,19 @@ mod test {
                 let non_compact_next = g
                     .simulate_with_moves(
                         &instruments,
-                         non_compact_move_map.iter().map(|(sid, mvs)| (sid.clone(), mvs.as_slice()))).collect_vec();
-                let compact_next = compact.simulate_with_moves(&instruments, compact_move_map.iter().map(|(sid, mvs)| (*sid, mvs.as_slice()))).collect_vec();
+                        non_compact_move_map
+                            .iter()
+                            .map(|(sid, mvs)| (sid.clone(), mvs.as_slice())),
+                    )
+                    .collect_vec();
+                let compact_next = compact
+                    .simulate_with_moves(
+                        &instruments,
+                        compact_move_map
+                            .iter()
+                            .map(|(sid, mvs)| (*sid, mvs.as_slice())),
+                    )
+                    .collect_vec();
                 assert_eq!(non_compact_next.len(), 1);
                 assert_eq!(compact_next.len(), 1);
                 g = non_compact_next[0].clone().1;
@@ -1277,16 +1315,19 @@ mod test {
         let non_compact_lookup =
             build_non_compact_lookup(snake_id_mapping.clone(), non_compact_res);
 
-        let compact_results = compact.simulate(
-            &Instruments,
-            snake_id_mapping.values().copied().collect_vec(),
-        ).collect_vec();
+        let compact_results = compact
+            .simulate(
+                &Instruments,
+                snake_id_mapping.values().copied().collect_vec(),
+            )
+            .collect_vec();
         for (moves, compact_game) in &compact_results {
             if compact_game.healths.iter().filter(|h| **h > 0).count() > 1 {
                 eprintln!("{:?}", moves);
                 let non_compact_game = non_compact_lookup.get(&to_map_key(moves)).unwrap();
-                let non_compact_res =
-                    non_compact_game.simulate(&Instruments, non_compact_game.get_snake_ids()).collect_vec();
+                let non_compact_res = non_compact_game
+                    .simulate(&Instruments, non_compact_game.get_snake_ids())
+                    .collect_vec();
                 compare_simulated_games(
                     &snake_id_mapping,
                     non_compact_game,
@@ -1303,10 +1344,12 @@ mod test {
         non_compact_res: Vec<(Vec<(String, Move)>, DEGame)>,
         compact: CellBoard4Snakes11x11,
     ) {
-        let compact_results = compact.simulate(
-            &Instruments,
-            snake_id_mapping.values().copied().collect_vec(),
-        ).collect_vec();
+        let compact_results = compact
+            .simulate(
+                &Instruments,
+                snake_id_mapping.values().copied().collect_vec(),
+            )
+            .collect_vec();
         assert!(compact_results.len() <= non_compact_res.len()); // TODO: We need to apply the same optimization about walls to the non-compact version to make sure they eliminate the same moves
         let non_compact_lookup =
             build_non_compact_lookup(snake_id_mapping.clone(), non_compact_res);

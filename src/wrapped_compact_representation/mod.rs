@@ -2,16 +2,14 @@
 use crate::types::{
     build_snake_id_map, FoodGettableGame, HazardQueryableGame, HazardSettableGame,
     HeadGettableGame, HealthGettableGame, LengthGettableGame, PositionGettableGame,
-    RandomReasonableMovesGame, SizeDeterminableGame, SnakeIDGettableGame, SnakeIDMap, SnakeId,
-    VictorDeterminableGame, YouDeterminableGame, N_MOVES
+    RandomReasonableMovesGame, SizeDeterminableGame, SnakeBodyIterableGame, SnakeIDGettableGame,
+    SnakeIDMap, SnakeId, VictorDeterminableGame, YouDeterminableGame, N_MOVES,
 };
 /// you almost certainly want to use the `convert_from_game` method to
 /// cast from a json represention to a `CellBoard`
 use crate::types::{NeighborDeterminableGame, SnakeBodyGettableGame};
 use crate::wire_representation::Game;
-pub use crate::wrapped_compact_representation::eval::{
-    SinglePlayerMoveResult,
-};
+pub use crate::wrapped_compact_representation::eval::SinglePlayerMoveResult;
 use itertools::Itertools;
 use rand::prelude::IteratorRandom;
 use rand::thread_rng;
@@ -1003,29 +1001,33 @@ impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> VictorDetermi
 impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> RandomReasonableMovesGame
     for CellBoard<T, BOARD_SIZE, MAX_SNAKES>
 {
-    fn random_reasonable_move_for_each_snake<'a>(&'a self) -> Box<dyn std::iter::Iterator<Item = (SnakeId, Move)> + 'a> {
+    fn random_reasonable_move_for_each_snake<'a>(
+        &'a self,
+    ) -> Box<dyn std::iter::Iterator<Item = (SnakeId, Move)> + 'a> {
         let width = self.actual_width;
-        Box::new(self.healths
-            .iter()
-            .enumerate()
-            .filter(|(_, health)| **health > 0)
-            .map(move |(idx, _)| {
-                let head = self.heads[idx];
-                let head_pos = head.into_position(width);
+        Box::new(
+            self.healths
+                .iter()
+                .enumerate()
+                .filter(|(_, health)| **health > 0)
+                .map(move |(idx, _)| {
+                    let head = self.heads[idx];
+                    let head_pos = head.into_position(width);
 
-                let mv = Move::all()
-                    .iter()
-                    .filter(|mv| {
-                        let new_head = head_pos.add_vec(mv.to_vector());
-                        let ci = self.as_wrapped_cell_index(new_head);
+                    let mv = Move::all()
+                        .iter()
+                        .filter(|mv| {
+                            let new_head = head_pos.add_vec(mv.to_vector());
+                            let ci = self.as_wrapped_cell_index(new_head);
 
-                        !self.get_cell(ci).is_body_segment() && !self.get_cell(ci).is_head()
-                    })
-                    .choose(&mut thread_rng())
-                    .copied()
-                    .unwrap_or(Move::Up);
-                (SnakeId(idx as u8), mv)
-            }))
+                            !self.get_cell(ci).is_body_segment() && !self.get_cell(ci).is_head()
+                        })
+                        .choose(&mut thread_rng())
+                        .copied()
+                        .unwrap_or(Move::Up);
+                    (SnakeId(idx as u8), mv)
+                }),
+        )
     }
 }
 
@@ -1036,9 +1038,11 @@ impl<T: SimulatorInstruments, N: CellNum, const BOARD_SIZE: usize, const MAX_SNA
     fn simulate_with_moves<S>(
         &self,
         instruments: &T,
-        snake_ids_and_moves: impl IntoIterator<Item=(Self::SnakeIDType, S)>,
-    ) -> Box<dyn Iterator<Item=(Vec<(Self::SnakeIDType, Move)>, Self)> + '_> 
-    where S: Borrow<[Move]> {
+        snake_ids_and_moves: impl IntoIterator<Item = (Self::SnakeIDType, S)>,
+    ) -> Box<dyn Iterator<Item = (Vec<(Self::SnakeIDType, Move)>, Self)> + '_>
+    where
+        S: Borrow<[Move]>,
+    {
         let start = Instant::now();
         let snake_ids_and_moves = snake_ids_and_moves.into_iter().collect_vec();
 
@@ -1166,6 +1170,30 @@ impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> SizeDetermina
     }
 }
 
+impl<T: CellNum, const BOARD_SIZEL: usize, const MAX_SNAKES: usize> SnakeBodyIterableGame
+    for CellBoard<T, BOARD_SIZEL, MAX_SNAKES>
+{
+    fn get_snake_body_iter<'s>(
+        &'s self,
+        snake_id: &Self::SnakeIDType,
+    ) -> Box<dyn Iterator<Item = Self::NativePositionType> + 's> {
+        let head = self.get_head_as_native_position(snake_id);
+
+        let mut cur = Some(self.get_cell(head).get_tail_position(head).unwrap());
+
+        Box::new(std::iter::from_fn(move || {
+            if let Some(c) = cur {
+                let to_return = c;
+                cur = self.get_cell(c).get_next_index();
+
+                Some(to_return)
+            } else {
+                None
+            }
+        }))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
@@ -1243,7 +1271,9 @@ mod test {
         let instruments = Instruments {};
         let wrapped_for_down = orig_wrapped_cell
             .clone()
-            .simulate_with_moves(&instruments, move_map.into_iter()).next().unwrap()
+            .simulate_with_moves(&instruments, move_map.into_iter())
+            .next()
+            .unwrap()
             .1;
         run_move_test(
             wrapped_for_down,
@@ -1278,7 +1308,13 @@ mod test {
                 .into_iter()
                 .map(|(sid, mv)| (sid, [mv]))
                 .collect_vec();
-            wrapped = wrapped.simulate_with_moves(&instruments, move_map.iter().map(|(sid, mv)| (*sid, mv.as_slice()))).collect_vec()[0].1;
+            wrapped = wrapped
+                .simulate_with_moves(
+                    &instruments,
+                    move_map.iter().map(|(sid, mv)| (*sid, mv.as_slice())),
+                )
+                .collect_vec()[0]
+                .1;
         }
         assert!(wrapped.get_health(SnakeId(0)) as i32 > 0);
         assert!(wrapped.get_health(SnakeId(1)) as i32 > 0);
@@ -1302,7 +1338,16 @@ mod test {
         let start_y = wrapped_cell.get_head_as_position(&SnakeId(0)).y;
         let start_x = wrapped_cell.get_head_as_position(&SnakeId(0)).x;
         for _ in 0..rollout {
-            wrapped_cell = wrapped_cell.simulate_with_moves(&instruments, move_map.iter().map(|(sid, mv)| (*sid, mv.as_slice())).clone()).collect_vec()[0].1;
+            wrapped_cell = wrapped_cell
+                .simulate_with_moves(
+                    &instruments,
+                    move_map
+                        .iter()
+                        .map(|(sid, mv)| (*sid, mv.as_slice()))
+                        .clone(),
+                )
+                .collect_vec()[0]
+                .1;
         }
         let end_y = wrapped_cell.get_head_as_position(&SnakeId(0)).y;
         let end_x = wrapped_cell.get_head_as_position(&SnakeId(0)).x;
