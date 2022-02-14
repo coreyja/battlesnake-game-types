@@ -927,41 +927,44 @@ impl<T: SimulatorInstruments, N: CellNum, const BOARD_SIZE: usize, const MAX_SNA
 impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> NeighborDeterminableGame
     for CellBoard<T, BOARD_SIZE, MAX_SNAKES>
 {
-    fn possible_moves(
-        &self,
+    fn possible_moves<'s>(
+        &'s self,
         pos: &Self::NativePositionType,
-    ) -> Vec<(Move, Self::NativePositionType)> {
+    ) -> Box<dyn Iterator<Item = (Move, Self::NativePositionType)> + 's> {
         let width = self.actual_width;
+        let head_pos = pos.into_position(width);
 
-        Move::all()
-            .iter()
-            .map(|mv| {
-                let head_pos = pos.into_position(width);
-                let new_head = head_pos.add_vec(mv.to_vector());
-                let ci = CellIndex::new(new_head, width);
+        Box::new(
+            Move::all_iter()
+                .map(move |mv| {
+                    let new_head = head_pos.add_vec(mv.to_vector());
+                    let ci = CellIndex::new(new_head, width);
 
-                (*mv, new_head, ci)
-            })
-            .filter(|(_mv, new_head, _)| !self.off_board(*new_head))
-            .map(|(mv, _, ci)| (mv, ci))
-            .collect()
+                    (mv, new_head, ci)
+                })
+                .filter(move |(_mv, new_head, _)| !self.off_board(*new_head))
+                .map(|(mv, _, ci)| (mv, ci)),
+        )
     }
 
-    fn neighbors(&self, pos: &Self::NativePositionType) -> std::vec::Vec<Self::NativePositionType> {
+    fn neighbors<'s>(
+        &'s self,
+        pos: &Self::NativePositionType,
+    ) -> Box<dyn Iterator<Item = Self::NativePositionType> + 's> {
         let width = self.actual_width;
+        let head_pos = pos.into_position(width);
 
-        Move::all()
-            .iter()
-            .map(|mv| {
-                let head_pos = pos.into_position(width);
-                let new_head = head_pos.add_vec(mv.to_vector());
-                let ci = CellIndex::new(new_head, width);
+        Box::new(
+            Move::all_iter()
+                .map(move |mv| {
+                    let new_head = head_pos.add_vec(mv.to_vector());
+                    let ci = CellIndex::new(new_head, width);
 
-                (new_head, ci)
-            })
-            .filter(|(new_head, _)| !self.off_board(*new_head))
-            .map(|(_, ci)| ci)
-            .collect()
+                    (new_head, ci)
+                })
+                .filter(move |(new_head, _)| !self.off_board(*new_head))
+                .map(|(_, ci)| ci),
+        )
     }
 }
 

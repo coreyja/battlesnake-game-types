@@ -74,6 +74,11 @@ impl Move {
         [Move::Up, Move::Down, Move::Left, Move::Right]
     }
 
+    /// returns an Iterator of all possible moves
+    pub fn all_iter() -> MoveIter {
+        MoveIter(0)
+    }
+
     /// converts this move to a usize index. indices are the same order as the `Move::all()` method
     pub fn as_index(&self) -> usize {
         match self {
@@ -105,6 +110,26 @@ impl Move {
                 | (Move::Left, Move::Right)
                 | (Move::Right, Move::Left)
         )
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+/// Iterator over all moves. Returned by `Move::all_iter()`
+///
+/// The iterator yields elements in the same order as `Move::all()`
+pub struct MoveIter(usize);
+
+impl Iterator for MoveIter {
+    type Item = Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.0 < N_MOVES {
+            let m = Move::from_index(self.0);
+            self.0 += 1;
+            Some(m)
+        } else {
+            None
+        }
     }
 }
 
@@ -310,13 +335,16 @@ pub trait RandomReasonableMovesGame: SnakeIDGettableGame {
 /// a game for which the neighbors of a given Position can be determined
 pub trait NeighborDeterminableGame: PositionGettableGame {
     /// returns the neighboring positions
-    fn neighbors(&self, pos: &Self::NativePositionType) -> Vec<Self::NativePositionType>;
+    fn neighbors<'s>(
+        &'s self,
+        pos: &Self::NativePositionType,
+    ) -> Box<dyn Iterator<Item = Self::NativePositionType> + 's>;
 
     /// returns the neighboring positions, and the Move required to get to each
-    fn possible_moves(
-        &self,
+    fn possible_moves<'s>(
+        &'s self,
         pos: &Self::NativePositionType,
-    ) -> Vec<(Move, Self::NativePositionType)>;
+    ) -> Box<dyn Iterator<Item = (Move, Self::NativePositionType)> + 's>;
 }
 
 /// a game for which each snakes shout can be determined
