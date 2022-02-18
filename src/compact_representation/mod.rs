@@ -4,7 +4,7 @@ use crate::types::{
     build_snake_id_map, FoodGettableGame, HazardQueryableGame, HazardSettableGame,
     HeadGettableGame, HealthGettableGame, LengthGettableGame, NeckGettableGame,
     PositionGettableGame, RandomReasonableMovesGame, ReasonableMoveDeterminableGame,
-    SizeDeterminableGame, SnakeBodyIterableGame, SnakeIDGettableGame, SnakeIDMap, SnakeId,
+    SizeDeterminableGame, SnakeBodyIterableGame, SnakeIDGettableGame, SnakeIDMap, SnakeId, Vector,
     VictorDeterminableGame, YouDeterminableGame, N_MOVES,
 };
 /// you almost certainly want to use the `convert_from_game` method to
@@ -747,7 +747,7 @@ impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> NeckGettableG
         &self,
         snake_id: &Self::SnakeIDType,
     ) -> Self::NativePositionType {
-        self.get_snake_body_iter(snake_id).last().unwrap()
+        self.get_snake_body_vec(snake_id)[1]
     }
 }
 
@@ -1002,11 +1002,14 @@ impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> ReasonableMov
         let neck_vec = neck_pos.to_vector();
 
         let neck_move_vec = head_pos.sub_vec(neck_vec).to_vector();
-        let neck_move = Move::from_vector(neck_move_vec);
+        let neck_move = match &neck_move_vec {
+            Vector { x: 0, y: 0 } => None,
+            x => Some(Move::from_vector(*x)),
+        };
 
         let neighbors = self.possible_moves(&self.get_head_as_native_position(sid));
 
-        Box::new(neighbors.filter(move |(m, _)| m != &neck_move))
+        Box::new(neighbors.filter(move |(m, _)| Some(m) != neck_move.as_ref()))
     }
 }
 

@@ -65,7 +65,7 @@ impl Move {
             Vector { x: 1, y: 0 } => Self::Right,
             Vector { x: 0, y: 1 } => Self::Up,
             Vector { x: 0, y: -1 } => Self::Down,
-            _ => panic!(),
+            _ => panic!("{:?}", vector),
         }
     }
 
