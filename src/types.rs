@@ -283,6 +283,19 @@ pub trait HeadGettableGame: PositionGettableGame + SnakeIDGettableGame {
         -> Self::NativePositionType;
 }
 
+/// A game for which the neck of the current snake can be got.
+pub trait NeckGettableGame: PositionGettableGame + SnakeIDGettableGame {
+    /// get the head position for a given snake id, as a position struct (slow for simulation)
+    fn get_neck_as_position(
+        &self,
+        snake_id: &Self::SnakeIDType,
+    ) -> crate::wire_representation::Position;
+
+    /// get the head position for a given snake as some "native" type for this game
+    fn get_neck_as_native_position(&self, snake_id: &Self::SnakeIDType)
+        -> Self::NativePositionType;
+}
+
 /// A game for which the food on the board can be queries
 pub trait FoodGettableGame: PositionGettableGame + SnakeIDGettableGame {
     /// get the head position for a given snake id, as a position struct (slow for simulation)
@@ -344,6 +357,20 @@ pub trait NeighborDeterminableGame: PositionGettableGame {
     fn possible_moves<'s>(
         &'s self,
         pos: &Self::NativePositionType,
+    ) -> Box<dyn Iterator<Item = (Move, Self::NativePositionType)> + 's>;
+}
+
+/// a game for which the reasonable moves for a given snake can be determined
+///
+/// This will eliminate moves that collide immediately with ourselves
+pub trait ReasonableMoveDeterminableGame:
+    NeighborDeterminableGame + SnakeIDGettableGame + HeadGettableGame
+{
+    /// returns the reasonable moves for a given snake, that are NOT the forbidden move or move off
+    /// the board
+    fn reasonable_moves<'s>(
+        &'s self,
+        sid: &Self::SnakeIDType,
     ) -> Box<dyn Iterator<Item = (Move, Self::NativePositionType)> + 's>;
 }
 

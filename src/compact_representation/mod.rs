@@ -2,9 +2,10 @@
 pub use crate::compact_representation::eval::SinglePlayerMoveResult;
 use crate::types::{
     build_snake_id_map, FoodGettableGame, HazardQueryableGame, HazardSettableGame,
-    HeadGettableGame, HealthGettableGame, LengthGettableGame, PositionGettableGame,
-    RandomReasonableMovesGame, SizeDeterminableGame, SnakeBodyIterableGame, SnakeIDGettableGame,
-    SnakeIDMap, SnakeId, VictorDeterminableGame, YouDeterminableGame, N_MOVES,
+    HeadGettableGame, HealthGettableGame, LengthGettableGame, NeckGettableGame,
+    PositionGettableGame, RandomReasonableMovesGame, ReasonableMoveDeterminableGame,
+    SizeDeterminableGame, SnakeBodyIterableGame, SnakeIDGettableGame, SnakeIDMap, SnakeId,
+    VictorDeterminableGame, YouDeterminableGame, N_MOVES,
 };
 /// you almost certainly want to use the `convert_from_game` method to
 /// cast from a json represention to a `CellBoard`
@@ -730,6 +731,26 @@ impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> HeadGettableG
     }
 }
 
+impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> NeckGettableGame
+    for CellBoard<T, BOARD_SIZE, MAX_SNAKES>
+{
+    fn get_neck_as_position(
+        &self,
+        snake_id: &Self::SnakeIDType,
+    ) -> crate::wire_representation::Position {
+        let neck = self.get_neck_as_native_position(snake_id);
+        let width = self.actual_width;
+        neck.into_position(width)
+    }
+
+    fn get_neck_as_native_position(
+        &self,
+        snake_id: &Self::SnakeIDType,
+    ) -> Self::NativePositionType {
+        self.get_snake_body_iter(snake_id).last().unwrap()
+    }
+}
+
 impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> FoodGettableGame
     for CellBoard<T, BOARD_SIZE, MAX_SNAKES>
 {
@@ -965,6 +986,27 @@ impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> NeighborDeter
                 .filter(move |(new_head, _)| !self.off_board(*new_head))
                 .map(|(_, ci)| ci),
         )
+    }
+}
+
+impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> ReasonableMoveDeterminableGame
+    for CellBoard<T, BOARD_SIZE, MAX_SNAKES>
+{
+    fn reasonable_moves<'s>(
+        &'s self,
+        sid: &Self::SnakeIDType,
+    ) -> Box<dyn Iterator<Item = (Move, Self::NativePositionType)> + 's> {
+        let head_pos = self.get_head_as_position(sid);
+        let neck_pos = self.get_neck_as_position(sid);
+
+        let neck_vec = neck_pos.to_vector();
+
+        let neck_move_vec = head_pos.sub_vec(neck_vec).to_vector();
+        let neck_move = Move::from_vector(neck_move_vec);
+
+        let neighbors = self.possible_moves(&self.get_head_as_native_position(sid));
+
+        Box::new(neighbors.filter(move |(m, _)| m != &neck_move))
     }
 }
 
