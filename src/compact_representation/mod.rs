@@ -999,9 +999,9 @@ impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> ReasonableMov
         let head_pos = self.get_head_as_position(sid);
         let neck_pos = self.get_neck_as_position(sid);
 
-        let neck_vec = neck_pos.to_vector();
+        let head_vec = head_pos.to_vector();
 
-        let neck_move_vec = head_pos.sub_vec(neck_vec).to_vector();
+        let neck_move_vec = neck_pos.sub_vec(head_vec).to_vector();
         let neck_move = match &neck_move_vec {
             Vector { x: 0, y: 0 } => None,
             x => Some(Move::from_vector(*x)),
@@ -1172,6 +1172,54 @@ mod test {
             compact.get_head_as_native_position(&SnakeId(0)),
             CellIndex(6 * 11 + 4)
         );
+    }
+
+    #[test]
+    fn test_neck_and_head_start() {
+        let game_fixture = include_str!("../../fixtures/start_of_game.json");
+        let g: Result<DEGame, _> = serde_json::from_slice(game_fixture.as_bytes());
+        let g = g.expect("the json literal is valid");
+        let snake_id_mapping = build_snake_id_map(&g);
+        let compact: CellBoard4Snakes11x11 = g.as_cell_board(&snake_id_mapping).unwrap();
+
+        let snakes_ids = compact.get_snake_ids();
+        let sid = snakes_ids[0];
+        let head = compact.get_head_as_position(&sid);
+        assert_eq!(head, Position { x: 5, y: 8 });
+
+        let neck = compact.get_neck_as_position(&sid);
+        assert_eq!(neck, Position { x: 5, y: 9 });
+
+        let reasonable_moves = compact.reasonable_moves(&sid).map(|x| x.0).collect_vec();
+        assert_eq!(reasonable_moves, vec![Move::Down, Move::Left, Move::Right]);
+    }
+
+    #[test]
+    fn test_neck_and_head_late() {
+        let game_fixture = include_str!("../../fixtures/late_stage.json");
+        let g: Result<DEGame, _> = serde_json::from_slice(game_fixture.as_bytes());
+        let g = g.expect("the json literal is valid");
+        let snake_id_mapping = build_snake_id_map(&g);
+        let compact: CellBoard4Snakes11x11 = g.as_cell_board(&snake_id_mapping).unwrap();
+
+        let snakes_ids = compact.get_snake_ids();
+        let sid = snakes_ids[0];
+        let head = compact.get_head_as_position(&sid);
+        assert_eq!(head, Position { x: 4, y: 6 });
+
+        let neck = compact.get_neck_as_position(&sid);
+        assert_eq!(neck, Position { x: 4, y: 5 });
+
+        let reasonable_moves = compact.reasonable_moves(&sid).map(|x| x.0).collect_vec();
+        assert_eq!(reasonable_moves, vec![Move::Up, Move::Left, Move::Right]);
+
+        let mut body_vec = compact.get_snake_body_vec(&sid);
+        let mut body_iter = compact.get_snake_body_iter(&sid).collect_vec();
+
+        body_vec.sort();
+        body_iter.sort();
+
+        assert_eq!(body_vec, body_iter);
     }
 
     #[test]
