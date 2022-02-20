@@ -1178,7 +1178,7 @@ impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> ReasonableMov
         let neck_move_vec = neck_pos.sub_vec(head_vec).to_vector();
         let neck_move = match &neck_move_vec {
             Vector { x: 0, y: 0 } => None,
-            x => Some(Move::from_vector(*x)),
+            x => Some(Move::from_wrapped_vector(*x, self.actual_width.into())),
         };
 
         let neighbors = self.possible_moves(&self.get_head_as_native_position(sid));

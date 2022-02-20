@@ -69,6 +69,30 @@ impl Move {
         }
     }
 
+    /// create a Move from the given vector taking
+    /// into account Wrapped rules
+    pub fn from_wrapped_vector(vector: Vector, width: i64) -> Self {
+        match vector {
+            Vector { x: -1, y: 0 } => Self::Left,
+            Vector { x: 1, y: 0 } => Self::Right,
+            Vector { x: 0, y: 1 } => Self::Up,
+            Vector { x: 0, y: -1 } => Self::Down,
+            Vector { x, y } => {
+                if x == width - 1 && y == 0 {
+                    Self::Left
+                } else if x == -(width - 1) && y == 0 {
+                    Self::Right
+                } else if x == 0 && y == -(width - 1) {
+                    Self::Up
+                } else if x == 0 && y == width - 1 {
+                    Self::Down
+                } else {
+                    panic!("{:?}", vector)
+                }
+            }
+        }
+    }
+
     /// returns a vec of all possible moves
     pub const fn all() -> [Self; N_MOVES] {
         [Move::Up, Move::Down, Move::Left, Move::Right]
