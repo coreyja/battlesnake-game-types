@@ -1137,7 +1137,6 @@ impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> NeighborDeter
 
                     (mv, new_head, ci)
                 })
-                .filter(move |(_mv, new_head, _)| !self.off_board(*new_head))
                 .map(|(mv, _, ci)| (mv, ci)),
         )
     }
@@ -1157,7 +1156,6 @@ impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> NeighborDeter
 
                     (new_head, ci)
                 })
-                .filter(move |(new_head, _)| !self.off_board(*new_head))
                 .map(|(_, ci)| ci),
         )
     }
