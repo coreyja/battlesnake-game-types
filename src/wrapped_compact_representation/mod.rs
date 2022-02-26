@@ -1133,7 +1133,7 @@ impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> NeighborDeter
             Move::all_iter()
                 .map(move |mv| {
                     let new_head = head_pos.add_vec(mv.to_vector());
-                    let ci = CellIndex::new(new_head, width);
+                    let ci = self.as_wrapped_cell_index(new_head);
 
                     (mv, new_head, ci)
                 })
@@ -1153,7 +1153,7 @@ impl<T: CellNum, const BOARD_SIZE: usize, const MAX_SNAKES: usize> NeighborDeter
             Move::all_iter()
                 .map(move |mv| {
                     let new_head = head_pos.add_vec(mv.to_vector());
-                    let ci = CellIndex::new(new_head, width);
+                    let ci = self.as_wrapped_cell_index(new_head);
 
                     (new_head, ci)
                 })
