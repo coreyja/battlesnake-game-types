@@ -1,3 +1,5 @@
+//! This module holds the `NeighborDeterminableGame` trait impl for wrapped and other code related
+//! to its SIMD implementation.
 use std::convert::TryInto;
 
 use core_simd::{simd_swizzle, Simd};
@@ -9,9 +11,7 @@ use super::super::CellNum as CN;
 use super::CellBoard;
 
 /// a game for which the neighbors of a given Position can be determined
-pub(crate) trait FixedNeighborDeterminableGame<const N_MOVES: usize>:
-    PositionGettableGame
-{
+pub trait FixedNeighborDeterminableGame<const N_MOVES: usize>: PositionGettableGame {
     /// returns the neighboring positions
     fn neighbors_fixed<'a>(
         &'a self,

@@ -27,7 +27,7 @@ use super::core::{simulate_with_moves, EvaluateMode};
 use super::core::{CellBoard as CCB, CellIndex};
 use super::CellNum as CN;
 
-mod neighbors;
+pub mod neighbors;
 
 /// A compact board representation that is significantly faster for simulation than
 /// `battlesnake_game_types::wire_representation::Game`.
