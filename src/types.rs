@@ -75,6 +75,11 @@ impl Move {
         [Move::Up, Move::Down, Move::Left, Move::Right]
     }
 
+    /// returns a simd vector of all possible moves, flattened
+    pub const fn all_simd() -> core_simd::Simd<i8, { N_MOVES * 2 }> {
+        core_simd::Simd::from_array([0, 1, 0, -1, -1, 0, 1, 0])
+    }
+
     /// returns an Iterator of all possible moves
     pub fn all_iter() -> MoveIter {
         MoveIter(0)

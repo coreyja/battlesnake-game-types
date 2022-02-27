@@ -212,7 +212,7 @@ impl<T: CN, const BOARD_SIZE: usize, const MAX_SNAKES: usize> NeighborDeterminab
         // This is the 4 possible moves flattened into a single SIMD vector
         // Order is important here, it has to match the order of `Move::all()`
         // Up, Down, Left, Right
-        let move_simd = core_simd::Simd::<i8, 8>::from_array([0, 1, 0, -1, -1, 0, 1, 0]);
+        let move_simd = Move::all_simd();
         let current_pos_simd = core_simd::Simd::<i8, 8>::from_array([
             head_pos.x as i8,
             head_pos.y as i8,
