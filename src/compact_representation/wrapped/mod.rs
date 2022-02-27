@@ -4,15 +4,14 @@ use crate::types::{
     build_snake_id_map, FoodGettableGame, FoodQueryableGame, HazardQueryableGame,
     HazardSettableGame, HeadGettableGame, HealthGettableGame, LengthGettableGame,
     NeckQueryableGame, PositionGettableGame, RandomReasonableMovesGame, SizeDeterminableGame,
-    SnakeIDGettableGame, SnakeIDMap, SnakeId, VictorDeterminableGame, YouDeterminableGame,
+    SnakeIDGettableGame, SnakeIDMap, SnakeId, VictorDeterminableGame, YouDeterminableGame, N_MOVES,
 };
 
 /// you almost certainly want to use the `convert_from_game` method to
 /// cast from a json represention to a `CellBoard`
 use crate::types::{NeighborDeterminableGame, SnakeBodyGettableGame};
 use crate::wire_representation::Game;
-use core_simd::Simd;
-use itertools::Itertools;
+use core_simd::{simd_swizzle, Simd};
 use rand::prelude::IteratorRandom;
 use rand::Rng;
 use std::borrow::Borrow;
@@ -201,6 +200,12 @@ impl<T: SimulatorInstruments, N: CN, const BOARD_SIZE: usize, const MAX_SNAKES: 
     }
 }
 
+/// Create a SIMD vector that helps for converting between Positions and CellIndexes
+/// It has a 1 for all the x coordinates and a `width` for all the y coordinates
+pub fn pos_to_cell_mul_simd(width: u8) -> core_simd::Simd<u8, { N_MOVES * 2 }> {
+    core_simd::Simd::from_array([1, width, 1, width, 1, width, 1, width])
+}
+
 impl<T: CN, const BOARD_SIZE: usize, const MAX_SNAKES: usize> NeighborDeterminableGame
     for CellBoard<T, BOARD_SIZE, MAX_SNAKES>
 {
@@ -237,20 +242,20 @@ impl<T: CN, const BOARD_SIZE: usize, const MAX_SNAKES: usize> NeighborDeterminab
 
         let new_pos_simd = negative_overflow_mask.select(Simd::splat(width_i - 1), new_pos_simd);
         let new_pos_simd = positive_overflow_mask.select(Simd::splat(0), new_pos_simd);
+        let new_pos_simd: Simd<u8, 8> = new_pos_simd.cast();
 
-        Box::new(
-            IntoIterator::into_iter(new_pos_simd.to_array())
-                .tuples()
-                .enumerate()
-                .map(move |(i, (x, y))| {
-                    let new_pos = Position::new(x as i32, y as i32);
-                    let new_pos_ci = CellIndex::new(new_pos, width);
+        let multiples_pos = new_pos_simd * pos_to_cell_mul_simd(width);
 
-                    let mv = Move::from_index(i);
+        let x_values = simd_swizzle!(multiples_pos, [0, 2, 4, 6]);
+        let y_values = simd_swizzle!(multiples_pos, [1, 3, 5, 7]);
 
-                    (mv, new_pos_ci)
-                }),
-        )
+        let indices = x_values + y_values;
+        let indices = indices
+            .to_array()
+            .map(|idx| CellIndex::from_u32(idx.into()));
+        let all = Move::all();
+
+        Box::new(IntoIterator::into_iter(all.zip(indices)))
     }
 
     fn neighbors<'a>(

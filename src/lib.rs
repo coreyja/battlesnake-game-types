@@ -4,7 +4,7 @@
     missing_debug_implementations,
     missing_docs
 )]
-#![feature(portable_simd)]
+#![feature(portable_simd, array_zip)]
 //! Types for working with [battlesnake](https://docs.battlesnake.com/).
 //! The goal is to provide simulation tooling and fast representations that
 //! enable development of efficient minmax/MCTS.
