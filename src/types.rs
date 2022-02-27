@@ -76,6 +76,10 @@ impl Move {
     }
 
     /// returns a simd vector of all possible moves, flattened
+    ///
+    /// This is the 4 possible moves flattened into a single SIMD vector
+    /// Order is important here, it has to match the order of `Move::all()`
+    /// Up, Down, Left, Right
     pub const fn all_simd() -> core_simd::Simd<i8, { N_MOVES * 2 }> {
         core_simd::Simd::from_array([0, 1, 0, -1, -1, 0, 1, 0])
     }
