@@ -11,11 +11,13 @@ use crate::types::{
 /// cast from a json represention to a `CellBoard`
 use crate::types::{NeighborDeterminableGame, SnakeBodyGettableGame};
 use crate::wire_representation::Game;
+use core_simd::Simd;
 use itertools::Itertools;
 use rand::prelude::IteratorRandom;
 use rand::Rng;
 use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::error::Error;
 use std::fmt::Display;
 
@@ -207,6 +209,7 @@ impl<T: CN, const BOARD_SIZE: usize, const MAX_SNAKES: usize> NeighborDeterminab
         pos: &Self::NativePositionType,
     ) -> Box<(dyn std::iter::Iterator<Item = (Move, CellIndex<T>)> + 'a)> {
         let width = self.embedded.get_actual_width();
+        let width_i: i8 = width.try_into().unwrap();
         let head_pos = pos.into_position(width);
 
         // This is the 4 possible moves flattened into a single SIMD vector
@@ -226,13 +229,22 @@ impl<T: CN, const BOARD_SIZE: usize, const MAX_SNAKES: usize> NeighborDeterminab
 
         let new_pos_simd = current_pos_simd + move_simd;
 
+        let negative_overflow_simd = core_simd::Simd::<i8, 8>::splat(-1);
+        let negative_overflow_mask = new_pos_simd.lanes_eq(negative_overflow_simd);
+
+        let positive_overflow_simd = core_simd::Simd::<i8, 8>::splat(width_i);
+        let positive_overflow_mask = new_pos_simd.lanes_eq(positive_overflow_simd);
+
+        let new_pos_simd = negative_overflow_mask.select(Simd::splat(width_i - 1), new_pos_simd);
+        let new_pos_simd = positive_overflow_mask.select(Simd::splat(0), new_pos_simd);
+
         Box::new(
             IntoIterator::into_iter(new_pos_simd.to_array())
                 .tuples()
                 .enumerate()
                 .map(move |(i, (x, y))| {
                     let new_pos = Position::new(x as i32, y as i32);
-                    let new_pos_ci = self.embedded.as_wrapped_cell_index(new_pos);
+                    let new_pos_ci = CellIndex::new(new_pos, width);
 
                     let mv = Move::from_index(i);
 
