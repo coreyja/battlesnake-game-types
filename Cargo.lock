@@ -23,6 +23,7 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 name = "battlesnake-game-types"
 version = "0.14.1"
 dependencies = [
+ "core_simd",
  "criterion",
  "fxhash",
  "itertools",
@@ -86,6 +87,11 @@ dependencies = [
  "textwrap",
  "unicode-width",
 ]
+
+[[package]]
+name = "core_simd"
+version = "0.1.0"
+source = "git+https://github.com/rust-lang/portable-simd#5f49d4c8435a25d804b2f375e949cb25479f5be9"
 
 [[package]]
 name = "criterion"
